@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Vertical Bird</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #70c5ce;
+    touch-action: none;
+    user-select: none;
+    font-family: sans-serif;
+}
+
+#game-container {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: calc(var(--vh, 1vh) * 100);
+}
+
+/* GAME */
+#game-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #70c5ce;
+}
+
+/* BIRD */
+#bird {
+    position: absolute;
+    width: 10vw;
+    height: 10vw;
+    max-width: 48px;
+    max-height: 48px;
+    min-width: 28px;
+    min-height: 28px;
+    background: yellow;
+    border: 3px solid #a0522d;
+    border-radius: 50%;
+    top: 80%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+
+/* Shield visual */
+#bird.shield {
+    box-shadow: 0 0 0 6px rgba(0,200,255,0.5);
+}
+
+/* PILLARS */
+.pillar-container {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 8%;
+    display: flex;
+}
+
+.pillar-segment {
+    background: #74bf2e;
+    border: 1px solid #000;
+}
+
+/* POWER UPS */
+.powerup {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    z-index: 12;
+}
+
+.powerup.shield { background: cyan; }
+.powerup.speed { background: orange; }
+.powerup.slow  { background: purple; }
+
+/* SCORE */
+#score {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    color: white;
+    font-size: 22px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px #000;
+    z-index: 20;
+}
+
+/* OVERLAYS */
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-align: center;
+    z-index: 30;
+}
+
+button {
+    margin-top: 20px;
+    padding: 12px 28px;
+    font-size: 18px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="game-container">
+    <div id="game-screen">
+        <div id="score">Score: 0</div>
+        <div id="bird"></div>
+    </div>
+
+    <div id="start" class="overlay">
+        <h2>Vertical Bird</h2>
+        <p>Move left / right to dodge</p>
+        <button onclick="startGame()">Start</button>
+    </div>
+
+    <div id="over" class="overlay" style="display:none">
+        <h2>Game Over</h2>
+        <p id="final"></p>
+        <button onclick="startGame()">Play Again</button>
+    </div>
+</div>
+
+<script>
+/* ===== VH FIX ===== */
+function fixVH(){
+    document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+}
+fixVH(); window.addEventListener('resize', fixVH);
+
+/* ===== ELEMENTS ===== */
+const screen = document.getElementById('game-screen');
+const bird = document.getElementById('bird');
+const scoreEl = document.getElementById('score');
+const startUI = document.getElementById('start');
+const overUI = document.getElementById('over');
+const finalEl = document.getElementById('final');
+
+/* ===== GAME VARS ===== */
+let w,h,bw,bh,bx;
+let speed, score, loop;
+let shield=false;
+let lastShieldTime=0;
+let pillarCount=0;
+
+/* ===== TUNING ===== */
+const BASE_SPEED = 2;
+const MAX_SPEED = 12;
+const SPEED_PER_SCORE = 0.35;
+const SPEED_PICKUP_BOOST = 1.2;
+
+const SHIELD_INTERVAL = 10000; // 10s
+const HIGH_SPEED_WARNING = 7;
+
+const PILLAR_HEIGHT_RATIO = 0.08;
+const PILLAR_SPACING_RATIO = 0.35;
+
+/* ===== RESIZE ===== */
+function resize(){
+    w = screen.clientWidth;
+    h = screen.clientHeight;
+    bw = bird.offsetWidth;
+    bh = bird.offsetHeight;
+    bx = w/2 - bw/2;
+    bird.style.left = bx+'px';
+}
+resize(); window.addEventListener('resize', resize);
+
+/* ===== INPUT ===== */
+screen.addEventListener('mousemove', move);
+screen.addEventListener('touchmove', move, {passive:false});
+
+function move(e){
+    if(!loop) return;
+    const rect = screen.getBoundingClientRect();
+    const x = (e.touches?e.touches[0].clientX:e.clientX) - rect.left;
+    bx = Math.max(0, Math.min(w-bw, x-bw/2));
+    bird.style.left = bx+'px';
+    e.preventDefault();
+}
+
+/* ===== COLLISION ===== */
+function circleRect(cx,cy,r,rx,ry,rw,rh){
+    const nx = Math.max(rx, Math.min(cx, rx+rw));
+    const ny = Math.max(ry, Math.min(cy, ry+rh));
+    const dx = cx-nx, dy = cy-ny;
+    return dx*dx + dy*dy < r*r;
+}
+
+/* ===== PILLARS ===== */
+function pillarHeight(){ return h * PILLAR_HEIGHT_RATIO; }
+
+function spawnPillar(){
+    const p = document.createElement('div');
+    p.className = 'pillar-container';
+    p.dataset.passed = 'false';
+    p.style.top = -pillarHeight() + 'px';
+
+    const holeW = Math.max(w*0.3, bw*2.5);
+    const holeX = Math.random()*(w-holeW);
+
+    addWall(p,holeX);
+    addGap(p,holeW);
+    addWall(p,w-holeX-holeW);
+
+    p.dataset.holeX = holeX;
+    p.dataset.holeW = holeW;
+
+    screen.appendChild(p);
+
+    pillarCount++;
+
+    // SPEED every 2 pillars
+    if(pillarCount % 2 === 0){
+        spawnSpeed(p);
+    }
+}
+
+function addWall(p,w){
+    if(w<=0) return;
+    const d=document.createElement('div');
+    d.className='pillar-segment';
+    d.style.width=w+'px';
+    p.appendChild(d);
+}
+function addGap(p,w){
+    const d=document.createElement('div');
+    d.style.width=w+'px';
+    p.appendChild(d);
+}
+
+/* ===== POWERUPS ===== */
+function spawnSpeed(pillar){
+    const pu=document.createElement('div');
+    pu.className='powerup speed';
+    pu.dataset.type='speed';
+
+    const holeX=parseFloat(pillar.dataset.holeX);
+    const holeW=parseFloat(pillar.dataset.holeW);
+
+    pu.style.left=(holeX + holeW/2 - 14)+'px';
+    pu.style.top=(parseFloat(pillar.style.top)+pillarHeight()+h*0.12)+'px';
+
+    screen.appendChild(pu);
+}
+
+function spawnShield(pillar){
+    const pu=document.createElement('div');
+    pu.className='powerup shield';
+    pu.dataset.type='shield';
+
+    const holeX=parseFloat(pillar.dataset.holeX);
+    const holeW=parseFloat(pillar.dataset.holeW);
+
+    pu.style.left=(holeX + holeW/2 - 14)+'px';
+    pu.style.top=(parseFloat(pillar.style.top)+pillarHeight()+h*0.12)+'px';
+
+    screen.appendChild(pu);
+}
+
+/* ===== VISUAL EFFECTS ===== */
+function updateEffects(){
+    const intensity = Math.min(1,(speed-HIGH_SPEED_WARNING)/3);
+
+    bird.style.boxShadow = intensity>0
+        ? `0 0 ${20+30*intensity}px rgba(255,80,80,${intensity})`
+        : '';
+
+    if(speed > HIGH_SPEED_WARNING){
+        const shake = intensity*6;
+        screen.style.transform =
+            `translate(${(Math.random()-0.5)*shake}px, ${(Math.random()-0.5)*shake}px)`;
+    } else {
+        screen.style.transform='translate(0,0)';
+    }
+}
+
+/* ===== GAME LOOP ===== */
+function update(){
+    const cy=h*0.8;
+    const cx=bx + bw/2;
+    const r=bw/2;
+    const ph=pillarHeight();
+
+    updateEffects();
+
+    document.querySelectorAll('.pillar-container').forEach(p=>{
+        const y=parseFloat(p.style.top)+speed;
+        p.style.top=y+'px';
+
+        let x=0;
+        for(const s of p.children){
+            const sw=parseFloat(s.style.width);
+            if(s.className){
+                if(circleRect(cx,cy,r,x,y,sw,ph)){
+                    if(shield){
+                        shield=false;
+                        bird.classList.remove('shield');
+                    } else endGame();
+                }
+            }
+            x+=sw;
+        }
+
+        if(y>cy && p.dataset.passed==='false'){
+            p.dataset.passed='true';
+            score++;
+            speed = Math.min(
+                MAX_SPEED,
+                BASE_SPEED + score*SPEED_PER_SCORE
+            );
+            scoreEl.textContent='Score: '+score;
+        }
+
+        if(y>h) p.remove();
+    });
+
+    document.querySelectorAll('.powerup').forEach(p=>{
+        const y=parseFloat(p.style.top)+speed;
+        p.style.top=y+'px';
+
+        if(circleRect(cx,cy,r,parseFloat(p.style.left),y,28,28)){
+            if(p.dataset.type==='speed'){
+                speed = Math.min(MAX_SPEED, speed + SPEED_PICKUP_BOOST);
+            }
+            if(p.dataset.type==='shield'){
+                shield=true;
+                bird.classList.add('shield');
+            }
+            p.remove();
+        }
+        if(y>h) p.remove();
+    });
+
+    ensureSinglePillar();
+    shieldTimer();
+}
+
+/* ===== SPAWN CONTROL ===== */
+function ensureSinglePillar(){
+    const pillars=document.querySelectorAll('.pillar-container');
+    if(!pillars.length){
+        spawnPillar(); return;
+    }
+    const last=pillars[pillars.length-1];
+    if(parseFloat(last.style.top) > h * PILLAR_SPACING_RATIO){
+        spawnPillar();
+    }
+}
+
+/* ===== SHIELD TIMER ===== */
+function shieldTimer(){
+    if(Date.now()-lastShieldTime > SHIELD_INTERVAL){
+        const last=document.querySelector('.pillar-container:last-child');
+        if(last) spawnShield(last);
+        lastShieldTime=Date.now();
+    }
+}
+
+/* ===== GAME STATE ===== */
+function startGame(){
+    speed=BASE_SPEED;
+    score=0;
+    shield=false;
+    pillarCount=0;
+    lastShieldTime=Date.now();
+
+    scoreEl.textContent='Score: 0';
+    bird.classList.remove('shield');
+    bird.style.boxShadow='';
+
+    screen.querySelectorAll('.pillar-container,.powerup').forEach(e=>e.remove());
+    startUI.style.display='none';
+    overUI.style.display='none';
+
+    loop=setInterval(update,1000/60);
+}
+
+function endGame(){
+    clearInterval(loop); loop=null;
+    screen.style.transform='translate(0,0)';
+    finalEl.textContent='Final Score: '+score;
+    overUI.style.display='flex';
+}
+</script>
+
+
+
+</script>
+
+</body>
+</html>

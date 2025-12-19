@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPT to PDF Layout Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* General Reset and Box Sizing */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Body and Initial Screen Fix (Vertical Centering) */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Branding Styles */
+        .branding {
+            text-align: center;
+            color: #ccc;
+            margin-top: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            background: #eef1ff;
+            border-color: #764ba2;
+        }
+
+        .upload-area.dragover {
+            background: #e0e7ff;
+            border-color: #667eea;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .file-info {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f4ff;
+            border-radius: 10px;
+            display: block; 
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .file-info strong {
+            display: inline-block; 
+            min-width: 60px;
+            margin-right: 5px;
+            margin-top: 5px;
+        }
+
+        .main-content {
+            display: none;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .controls-panel {
+            flex: 0 0 350px;
+            min-width: 300px; 
+        }
+
+        .preview-panel {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .option-group {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+        }
+
+        .option-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            flex: 1;
+        }
+
+        .btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .slides-per-page {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .slides-per-page button {
+            flex: 1;
+            min-width: 50px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .slides-per-page button:hover {
+            border-color: #667eea;
+        }
+
+        .slides-per-page button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .margin-control {
+            margin-top: 15px;
+        }
+
+        .margin-slider {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .margin-value {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .generate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        /* Combined Progress Style for Upload and Generation */
+        .progress {
+            margin-top: 15px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e7ff;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            white-space: nowrap;
+            padding-left: 8px;
+        }
+        
+        .progress.hidden {
+            display: none;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .preview-header h3 {
+            color: #333;
+        }
+
+        .page-counter {
+            background: #667eea;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .pages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+            gap: 20px;
+            width: 100%; /* Ensures grid respects container width */
+        }
+
+        .page-item {
+            position: relative;
+            border: 3px solid #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #f9f9f9;
+            transition: all 0.3s;
+        }
+
+        .page-item:hover {
+            border-color: #667eea;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .page-item.deleted {
+            opacity: 0.4;
+            border-color: #ff4444;
+        }
+
+        .page-number {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 2;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 32px;
+            text-align: center;
+            z-index: 2;
+            transition: all 0.3s;
+            opacity: 0;
+        }
+
+        .page-item:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .delete-btn:hover {
+            background: #cc0000;
+            transform: scale(1.1);
+        }
+
+        .page-item.deleted .delete-btn {
+            background: #4CAF50;
+            opacity: 1;
+        }
+
+        .page-item.deleted .delete-btn:before {
+            content: '↻';
+        }
+
+        .page-item:not(.deleted) .delete-btn:before {
+            content: '×';
+        }
+
+        .page-canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .live-preview {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f4ff;
+            border-radius: 10px;
+            overflow: hidden; 
+        }
+
+        .live-preview h4 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .preview-page {
+            background: white;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            position: relative;
+            width: 100%; 
+            height: auto; 
+            max-width: 400px; 
+            aspect-ratio: 210 / 297; 
+        }
+        
+        .preview-page.landscape {
+            aspect-ratio: 297 / 210; 
+        }
+
+        .preview-slide {
+            position: absolute;
+            border: 1px solid #ddd;
+            box-sizing: border-box; 
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .controls-panel {
+                flex: 1;
+                min-width: unset; 
+            }
+            
+            .container {
+                padding: 20px; 
+            }
+        }
+        
+        /* FIX: Explicitly force a single column for very narrow phones to prevent horizontal scrolling */
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+            .pages-grid {
+                /* Force single column layout */
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Override body vertical centering once content is displayed */
+        body.content-loaded {
+            justify-content: flex-start;
+            align-items: stretch;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="appContainer">
+        <h1>📄 PPT to PDF Layout Converter</h1>
+        <p class="subtitle">Convert your PPT slides into organized PDF layouts with live preview and you can delete your Page to</p>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📤</div>
+            <h3>Click to upload or drag & drop your PDF</h3>
+            <p style="color: #999; margin-top: 10px;">PDF files only</p>
+            <input type="file" id="fileInput" accept=".pdf">
+        </div>
+        
+        <div class="progress hidden" id="uploadProgress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="uploadProgressFill" style="width:0%;"></div>
+            </div>
+        </div>
+
+        <div class="file-info" id="fileInfo" style="display: none;"></div>
+
+        <div class="main-content" id="mainContent">
+            <div class="controls-panel">
+                <div class="option-group">
+                    <label>Orientation:</label>
+                    <div class="button-group">
+                        <button class="btn active" id="portraitBtn">Portrait</button>
+                        <button class="btn" id="landscapeBtn">Landscape</button>
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <label id="slidesLabel">Slides per page (recommended: 4):</label>
+                    <div class="slides-per-page" id="slidesPerPage"></div>
+                </div>
+
+                <div class="option-group">
+                    <label>Margin (mm): <span class="margin-value" id="marginValue">10</span></label>
+                    <div class="margin-control">
+                        <input type="range" id="marginSlider" class="margin-slider" min="0" max="30" value="10" step="1">
+                    </div>
+                </div>
+
+                <button class="generate-btn" id="generateBtn">Generate PDF</button>
+                
+                <div class="progress hidden" id="generationProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="generationProgressFill" style="width:0%;"></div>
+                    </div>
+                </div>
+
+                <div class="live-preview" id="livePreview">
+                    <h4>Live Preview Layout:</h4>
+                    <div id="previewContainer"></div>
+                </div>
+            </div>
+
+            <div class="preview-panel">
+                <div class="preview-header">
+                    <h3>Pages</h3>
+                    <span class="page-counter" id="pageCounter">0 pages</span>
+                </div>
+                <div class="pages-grid" id="pagesGrid"></div>
+            </div>
+        </div>
+    </div>
+    
+    <p class="branding">Made By Saqib</p>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pdfDoc = null;
+        let orientation = 'portrait';
+        let slidesPerPage = 4;
+        let margin = 10;
+        let deletedPages = new Set();
+        let pageCanvases = [];
+        const PREVIEW_CANVAS_SCALE = 1.5; 
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const mainContent = document.getElementById('mainContent');
+        const portraitBtn = document.getElementById('portraitBtn');
+        const landscapeBtn = document.getElementById('landscapeBtn');
+        const slidesPerPageContainer = document.getElementById('slidesPerPage');
+        const marginSlider = document.getElementById('marginSlider');
+        const marginValue = document.getElementById('marginValue');
+        const generateBtn = document.getElementById('generateBtn');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadProgressFill = document.getElementById('uploadProgressFill');
+        const generationProgress = document.getElementById('generationProgress');
+        const generationProgressFill = document.getElementById('generationProgressFill');
+        const pagesGrid = document.getElementById('pagesGrid');
+        const pageCounter = document.getElementById('pageCounter');
+        const slidesLabel = document.getElementById('slidesLabel');
+        const livePreview = document.getElementById('livePreview');
+        const previewContainer = document.getElementById('previewContainer');
+
+        const body = document.body;
+        
+        // --- Event Listeners ---
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type === 'application/pdf') {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        portraitBtn.addEventListener('click', () => {
+            orientation = 'portrait';
+            portraitBtn.classList.add('active');
+            landscapeBtn.classList.remove('active');
+            updateSlidesPerPageOptions();
+            updateLivePreview();
+        });
+
+        landscapeBtn.addEventListener('click', () => {
+            orientation = 'landscape';
+            landscapeBtn.classList.add('active');
+            portraitBtn.classList.remove('active');
+            updateSlidesPerPageOptions();
+            updateLivePreview();
+        });
+
+        marginSlider.addEventListener('input', (e) => {
+            margin = parseInt(e.target.value);
+            marginValue.textContent = margin;
+            updateLivePreview();
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            if (!pdfDoc) return;
+            await generatePDF();
+        });
+
+        // --- Core Functions ---
+
+        function updateSlidesPerPageOptions() {
+            slidesPerPageContainer.innerHTML = '';
+            let options = orientation === 'portrait' ? [1, 2, 3, 4, 6, 9, 12] : [1, 2, 3, 4, 6, 9, 12];
+            
+            let defaultSlideCount = orientation === 'portrait' ? 4 : 2; 
+
+            slidesLabel.textContent = `Slides per page (recommended: ${defaultSlideCount}):`;
+            
+            options.forEach(num => {
+                const btn = document.createElement('button');
+                btn.textContent = num;
+                btn.addEventListener('click', () => {
+                    slidesPerPage = num;
+                    document.querySelectorAll('.slides-per-page button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateLivePreview();
+                });
+                
+                if (num === slidesPerPage) {
+                    btn.classList.add('active');
+                } 
+                
+                slidesPerPageContainer.appendChild(btn);
+            });
+            
+            if (!options.includes(slidesPerPage)) {
+                 slidesPerPage = defaultSlideCount;
+            }
+        }
+        
+        updateSlidesPerPageOptions();
+
+
+        async function handleFileUpload(file) {
+            
+            pdfDoc = null;
+            fileInfo.innerHTML = `
+                <strong>File:</strong> ${file.name}<br>
+                <strong>Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB
+            `;
+            fileInfo.style.display = 'block';
+            mainContent.style.display = 'none';
+            pagesGrid.innerHTML = '';
+            deletedPages.clear();
+            body.classList.remove('content-loaded');
+            
+            uploadArea.style.display = 'none';
+            uploadProgress.classList.remove('hidden');
+            uploadProgressFill.style.width = '0%';
+            uploadProgressFill.textContent = ''; 
+
+            let progressInterval = setInterval(() => {
+                let currentWidth = parseInt(uploadProgressFill.style.width) || 0;
+                if (currentWidth < 90) {
+                    currentWidth += 5;
+                    uploadProgressFill.style.width = currentWidth + '%';
+                    uploadProgressFill.textContent = currentWidth + '% (Reading File)';
+                } else if (currentWidth < 98) {
+                    currentWidth += 1;
+                    uploadProgressFill.style.width = currentWidth + '%';
+                    uploadProgressFill.textContent = currentWidth + '% (Reading File)';
+                }
+            }, 100);
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer, cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/', cMapPacked: true }).promise;
+                fileInfo.innerHTML += `<br><strong>Pages:</strong> ${pdfDoc.numPages}`;
+                
+                clearInterval(progressInterval);
+                uploadProgressFill.style.width = '100%'; 
+                uploadProgressFill.textContent = '100% (Rendering Pages...)';
+                
+                await renderAllPages();
+                
+                mainContent.style.display = 'flex';
+                updatePageCounter();
+                updateLivePreview();
+                body.classList.add('content-loaded');
+
+            } catch (error) {
+                alert('Error loading PDF: ' + error.message);
+                console.error(error);
+            } finally {
+                setTimeout(() => {
+                    uploadProgress.classList.add('hidden');
+                    uploadProgressFill.style.width = '0%';
+                    uploadProgressFill.textContent = '';
+                    uploadArea.style.display = 'block';
+                }, 500);
+            }
+        }
+
+        async function renderAllPages() {
+            pagesGrid.innerHTML = '';
+            pageCanvases = [];
+            const totalPages = pdfDoc.numPages;
+
+            for (let i = 1; i <= totalPages; i++) {
+                const percent = Math.round((i / totalPages) * 100);
+                uploadProgressFill.style.width = percent + '%';
+                uploadProgressFill.textContent = percent + '% (Rendering Page ' + i + ')';
+                
+                const page = await pdfDoc.getPage(i);
+                const viewport = page.getViewport({ scale: PREVIEW_CANVAS_SCALE });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                canvas.className = 'page-canvas';
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                pageCanvases.push(canvas);
+
+                const pageItem = document.createElement('div');
+                pageItem.className = 'page-item';
+                pageItem.dataset.pageNum = i;
+
+                const pageNum = document.createElement('div');
+                pageNum.className = 'page-number';
+                pageNum.textContent = `Page ${i}`;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); 
+                    togglePageDeletion(i, pageItem);
+                });
+
+                pageItem.appendChild(pageNum);
+                pageItem.appendChild(deleteBtn);
+                pageItem.appendChild(canvas);
+                pagesGrid.appendChild(pageItem);
+            }
+        }
+
+        function togglePageDeletion(pageNum, pageItem) {
+            if (deletedPages.has(pageNum)) {
+                deletedPages.delete(pageNum);
+                pageItem.classList.remove('deleted');
+            } else {
+                deletedPages.add(pageNum);
+                pageItem.classList.add('deleted');
+            }
+            updatePageCounter();
+        }
+
+        function updatePageCounter() {
+            const activePages = pdfDoc ? (pdfDoc.numPages - deletedPages.size) : 0;
+            const totalPages = pdfDoc ? pdfDoc.numPages : 0;
+            pageCounter.textContent = `${activePages} / ${totalPages} pages`;
+        }
+        
+        function getSlideGridProperties(count, orient) {
+             let cols, rows;
+             if (count === 1) { cols = 1; rows = 1; } 
+             else if (count === 2) { 
+                 cols = orient === 'portrait' ? 1 : 2;
+                 rows = orient === 'portrait' ? 2 : 1;
+             } 
+             else if (count === 3) {
+                 cols = orient === 'portrait' ? 1 : 3;
+                 rows = orient === 'portrait' ? 3 : 1;
+             } 
+             else if (count === 4) { cols = 2; rows = 2; } 
+             else if (count === 6) { 
+                 cols = orient === 'portrait' ? 2 : 3;
+                 rows = orient === 'portrait' ? 3 : 2;
+             }
+             else if (count === 9) { cols = 3; rows = 3; }
+             else if (count === 12) { 
+                 cols = orient === 'portrait' ? 3 : 4;
+                 rows = orient === 'portrait' ? 4 : 3;
+             }
+             return { cols, rows };
+        }
+
+        function updateLivePreview() {
+            if (!pdfDoc) return;
+
+            const pageWidth = orientation === 'portrait' ? 210 : 297; // mm
+            const pageHeight = orientation === 'portrait' ? 297 : 210; // mm
+            
+            const { cols, rows } = getSlideGridProperties(slidesPerPage, orientation);
+
+            // Calculate total margin space (in mm)
+            const totalMarginX_mm = margin * (cols + 1);
+            const totalMarginY_mm = margin * (rows + 1);
+            
+            // Calculate margin and slide dimensions in percentages relative to the page size
+            const marginPercentX = (margin / pageWidth) * 100;
+            const marginPercentY = (margin / pageHeight) * 100;
+            
+            const slideWidthPercent = (100 - (totalMarginX_mm / pageWidth) * 100) / cols;
+            const slideHeightPercent = (100 - (totalMarginY_mm / pageHeight) * 100) / rows;
+
+            const PREVIEW_SCALE_MM = 0.5; 
+            previewContainer.innerHTML = '';
+            
+            const previewPage = document.createElement('div');
+            previewPage.className = 'preview-page';
+            
+            if (orientation === 'landscape') {
+                previewPage.classList.add('landscape');
+            } else {
+                previewPage.classList.remove('landscape');
+            }
+
+            for (let i = 0; i < slidesPerPage; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                
+                // Calculate position in percentage
+                const x_percent = marginPercentX + col * (slideWidthPercent + marginPercentX);
+                const y_percent = marginPercentY + row * (slideHeightPercent + marginPercentY);
+
+                const slide = document.createElement('div');
+                slide.className = 'preview-slide';
+                
+                // Sizing and positioning in percentage
+                slide.style.left = x_percent + '%';
+                slide.style.top = y_percent + '%';
+                slide.style.width = slideWidthPercent + '%';
+                slide.style.height = slideHeightPercent + '%';
+                
+                slide.style.background = '#e0e7ff';
+                slide.textContent = i + 1;
+                slide.style.display = 'flex';
+                slide.style.alignItems = 'center';
+                slide.style.justifyContent = 'center';
+                slide.style.color = '#667eea';
+                
+                // FIX: Set fontWeight to 'normal' to un-bold the live preview text
+                slide.style.fontWeight = 'normal'; 
+                
+                slide.style.fontSize = '3vw'; 
+
+                previewPage.appendChild(slide);
+            }
+
+            previewContainer.appendChild(previewPage);
+        }
+
+        async function generatePDF() {
+            generateBtn.disabled = true;
+            generationProgress.classList.remove('hidden');
+            generationProgressFill.style.width = '0%';
+            generationProgressFill.textContent = '';
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: orientation === 'portrait' ? 'p' : 'l',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const pageWidth = orientation === 'portrait' ? 210 : 297;
+                const pageHeight = orientation === 'portrait' ? 297 : 210;
+
+                const { cols, rows } = getSlideGridProperties(slidesPerPage, orientation);
+
+                const slideWidth = (pageWidth - margin * (cols + 1)) / cols;
+                const slideHeight = (pageHeight - margin * (rows + 1)) / rows;
+
+                let slideCount = 0;
+                let isFirstPage = true;
+                let processedPages = 0;
+                const totalActivePages = pdfDoc.numPages - deletedPages.size;
+                
+                const FINAL_CANVAS_SCALE = 3; 
+
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    if (deletedPages.has(i)) continue;
+
+                    const page = await pdfDoc.getPage(i);
+                    const viewport = page.getViewport({ scale: FINAL_CANVAS_SCALE });
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    const imgData = canvas.toDataURL('image/jpeg', 0.9);
+
+                    if (slideCount % slidesPerPage === 0 && !isFirstPage) {
+                        pdf.addPage();
+                    }
+                    isFirstPage = false;
+
+                    const posInPage = slideCount % slidesPerPage;
+                    const col = posInPage % cols;
+                    const row = Math.floor(posInPage / cols);
+
+                    const x = margin + col * (slideWidth + margin);
+                    const y = margin + row * (slideHeight + margin);
+
+                    pdf.addImage(imgData, 'JPEG', x, y, slideWidth, slideHeight);
+                    slideCount++;
+                    processedPages++;
+
+                    const percent = Math.round((processedPages / totalActivePages) * 100);
+                    generationProgressFill.style.width = percent + '%';
+                    generationProgressFill.textContent = percent + '% (Generating)';
+                }
+
+                pdf.save(`converted_${orientation}_${slidesPerPage}per_${margin}mm.pdf`);
+                
+                generationProgressFill.style.width = '100%';
+                generationProgressFill.textContent = 'Complete! File Downloaded.';
+                
+            } catch (error) {
+                alert('Error generating PDF: ' + error.message);
+                console.error(error);
+            } finally {
+                setTimeout(() => {
+                    generationProgress.classList.add('hidden');
+                    generationProgressFill.style.width = '0%';
+                    generationProgressFill.textContent = '';
+                    generateBtn.disabled = false;
+                }, 2000);
+            }
+        }
+        
+        updateSlidesPerPageOptions();
+        
+    </script>
+</body>
+</html>

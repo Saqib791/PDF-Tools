@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5x5 Rolling Tic Tac Toe</title>
+
+<style>
+:root{
+  --x:#3b82f6;
+  --o:#10b981;
+  --bg:#f3f4f6;
+  --cell:#ffffff;
+  --shadow:0 4px 6px rgba(0,0,0,.12);
+}
+body{
+  margin:0;
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:var(--bg);
+  font-family:system-ui, sans-serif;
+}
+.game-container{
+  width:95vw;
+  max-width:600px;
+  text-align:center;
+}
+h1{color:var(--x);}
+.score-board{
+  display:flex;
+  justify-content:space-around;
+  background:var(--cell);
+  padding:10px;
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  margin-bottom:15px;
+}
+#message{
+  min-height:2rem;
+  font-weight:700;
+  margin-bottom:12px;
+}
+.controls{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+button{
+  padding:10px 18px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:700;
+  box-shadow:var(--shadow);
+}
+.btn-ai{background:var(--x);color:#fff;}
+.btn-human{background:#6366f1;color:#fff;}
+.btn-reset{background:#ef4444;color:#fff;}
+button.active{background:var(--o);}
+
+.board-wrapper{
+  width:100%;
+  aspect-ratio:1/1;
+}
+#board{
+  height:100%;
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  grid-template-rows:repeat(4,1fr); /* 🔥 only 4 rows */
+  gap:8px;
+  padding:10px;
+}
+
+.cell{
+  background:var(--cell);
+  border-radius:8px;
+  box-shadow:var(--shadow);
+  position:relative;
+
+  /* FIX */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:2.4rem;
+  font-weight:900;
+  line-height:1;              /* 🔒 prevents vertical jump */
+  aspect-ratio:1/1;           /* 🔒 locks square */
+  overflow:hidden;            /* 🔒 no resize */
+  cursor:pointer;
+}
+
+}
+.cell.x{color:var(--x);pointer-events:none;}
+.cell.o{color:var(--o);pointer-events:none;}
+.cell.win{
+  background:#fde68a;
+  animation:pulse .5s infinite alternate;
+}
+@keyframes pulse{from{opacity:1}to{opacity:.8}}
+</style>
+</head>
+
+<body>
+<div class="game-container">
+<h1>5×5 Rolling Tic-Tac-Toe</h1>
+
+<div class="score-board">
+  <div id="sx">X: 0</div>
+  <div id="so">O: 0</div>
+  <div id="st">Ties: 0</div>
+</div>
+
+<div id="message">Choose a mode</div>
+
+<div class="controls">
+  <button class="btn-ai" id="ai">Single Player</button>
+  <button class="btn-human" id="human">Two Players</button>
+  <button class="btn-reset" onclick="resetGame()">Reset</button>
+</div>
+
+<div class="board-wrapper">
+  <div id="board"></div>
+</div>
+</div>
+
+<script>
+const SIZE = 5;
+const ROWS = 4;
+const CELLS = SIZE * ROWS; // 20 cells
+const WIN = 4;
+const boardEl=document.getElementById("board");
+const msg=document.getElementById("message");
+const cells=[];
+let board=new Array(CELLS).fill("");
+let history=[];
+let current="X";
+let active=false;
+let mode=null;
+let sx=0, so=0, st=0;
+
+/* ---------- INIT BOARD ---------- */
+for(let i=0;i<CELLS;i++){
+  const d=document.createElement("div");
+  d.className="cell";
+  d.addEventListener("click",()=>play(i));
+  boardEl.appendChild(d);
+  cells.push(d);
+}
+
+/* ---------- GAME LOGIC ---------- */
+function updateScores(){
+  sxEl.textContent=`X: ${sx}`;
+  soEl.textContent=`O: ${so}`;
+  stEl.textContent=`Ties: ${st}`;
+}
+const sxEl=document.getElementById("sx");
+const soEl=document.getElementById("so");
+const stEl=document.getElementById("st");
+
+function checkWin(b,p){
+  const dirs=[[1,0],[0,1],[1,1],[1,-1]];
+  for(let i=0;i<CELLS;i++){
+    if(b[i]!==p)continue;
+    for(const[dX,dY] of dirs){
+      let combo=[i];
+      for(let k=1;k<WIN;k++){
+        let r=Math.floor(i/SIZE)+dY*k;
+        let c=(i%SIZE)+dX*k;
+        if(r<0||r>=SIZE||c<0||c>=SIZE)break;
+        let idx=r*SIZE+c;
+        if(b[idx]!==p)break;
+        combo.push(idx);
+      }
+      if(combo.length===WIN)return combo;
+    }
+  }
+  return null;
+}
+
+function play(i){
+  if(!active||board[i]!=="")return;
+
+  if(history.length>=CELLS-1){
+    const old=history.shift();
+    board[old]="";
+    cells[old].textContent="";
+    cells[old].className="cell";
+  }
+
+  board[i]=current;
+  cells[i].textContent=current;
+  cells[i].classList.add(current.toLowerCase());
+  history.push(i);
+
+  const win=checkWin(board,current);
+  if(win){
+    active=false;
+    win.forEach(x=>cells[x].classList.add("win"));
+    msg.textContent=`${current} wins!`;
+    current==="X"?sx++:so++;
+    updateScores();
+    setTimeout(newRound,2000);
+    return;
+  }
+
+  current=current==="X"?"O":"X";
+  msg.textContent=`${current}'s turn`;
+
+  if(mode==="ai"&&current==="O"){
+    setTimeout(aiMove,400);
+  }
+}
+
+/* ---------- AI ---------- */
+function simulate(i,p){
+  let tb=[...board];
+  let th=[...history];
+  if(th.length>=CELLS-1)tb[th.shift()]="";
+  tb[i]=p;
+  return checkWin(tb,p);
+}
+
+function aiMove(){
+  let moves=[...Array(CELLS).keys()].filter(i=>board[i]==="");
+
+  for(const i of moves)if(simulate(i,"O"))return play(i);
+  for(const i of moves)if(simulate(i,"X"))return play(i);
+  if(moves.includes(12))return play(12);
+  play(moves[Math.floor(Math.random()*moves.length)]);
+}
+
+/* ---------- ROUNDS ---------- */
+function newRound(){
+  board.fill("");
+  history=[];
+  cells.forEach(c=>{c.textContent="";c.className="cell"});
+  active=true;
+  current=current==="X"?"O":"X";
+  msg.textContent=`New round – ${current} starts`;
+  if(mode==="ai"&&current==="O")setTimeout(aiMove,400);
+}
+
+function start(m){
+  mode=m;
+  active=true;
+  current="X";
+  board.fill("");
+  history=[];
+  cells.forEach(c=>{c.textContent="";c.className="cell"});
+  document.querySelectorAll("button").forEach(b=>b.classList.remove("active"));
+  document.getElementById(m).classList.add("active");
+  msg.textContent="Game started";
+}
+
+function resetGame(){
+  sx=so=st=0;
+  updateScores();
+  mode=null;
+  active=false;
+  board.fill("");
+  history=[];
+  cells.forEach(c=>{c.textContent="";c.className="cell"});
+  msg.textContent="Choose a mode";
+}
+
+document.getElementById("ai").onclick=()=>start("ai");
+document.getElementById("human").onclick=()=>start("human");
+updateScores();
+</script>
+</body>
+</html>

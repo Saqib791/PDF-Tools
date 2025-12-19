@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flappy Bird with Power-Ups</title>
+    <!-- Essential for mobile full-screen and preventing zooming -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        /* CSS to ensure full viewport coverage and remove all borders/margins */
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Hide scrollbars */
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #3f3f3f;
+            font-family: 'Arial', sans-serif;
+            flex-direction: column;
+            touch-action: manipulation;
+            position: relative;
+        }
+
+        #gameCanvas {
+            background-color: #70c5ce; /* Sky blue background */
+               width: 100vw;
+    height: 100vh;
+    display: block; }
+        /* Game info overlayed on the screen (Start/Game Over) */
+        #game-info {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: clamp(1em, 5vw, 2em);
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 10; /* Ensure it's on top */
+        }
+
+        /* Styling for the persistent HUD (Score and Power-Up Status) */
+        #hud-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: clamp(1em, 3vw, 1.5em);
+            text-shadow: 0 0 5px black;
+            z-index: 5;
+            display: flex;
+            gap: 20px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="hud-container">
+        <span id="score-display">Score: 0</span>
+        <!-- Removed initial 'Shield: Ready' text -->
+        <span id="power-display"></span>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+    <div id="game-info">Tap or press Space to start and flap!</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const infoElement = document.getElementById('game-info');
+        const scoreDisplay = document.getElementById('score-display');
+        const powerDisplay = document.getElementById('power-display');
+
+        // --- Core Game Constants ---
+        const ASPECT_WIDTH = 288;
+        const ASPECT_HEIGHT = 512;
+        let scale = 1;
+
+        // --- Game Difficulty Settings (Easy Mode) ---
+        const BASE_GRAVITY = 0.3;     
+        const BASE_JUMP_VELOCITY = -6; 
+        const BASE_PIPE_GAP = 120;     
+        const BASE_PIPE_WIDTH = 40;
+        const BASE_PIPE_SPEED = 1.5;
+        const BASE_BIRD_X = 50;
+        const STAR_SPAWN_CHANCE = 0.15; // 15% chance a star spawns per pipe
+
+        // --- Power-Up Constants ---
+        const SHIELD_DURATION = 5000; // 5 seconds in milliseconds
+
+        // --- Scaled Game State Variables ---
+        let BIRD_SIZE, GRAVITY, JUMP_VELOCITY, PIPE_WIDTH, PIPE_GAP, PIPE_SPEED, BIRD_X;
+        let birdY, velocity, pipes, score, isGameOver, isGameStarted;
+        let isShielded = false;
+        let shieldTimer = null;
+        let countdownInterval = null; // Track the countdown interval
+
+        // --- Dynamic Sizing Function ---
+     function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    scale = canvas.width / ASPECT_WIDTH;
+
+    BIRD_SIZE = 20 * scale;
+    GRAVITY = BASE_GRAVITY * scale;
+    JUMP_VELOCITY = BASE_JUMP_VELOCITY * scale;
+    PIPE_WIDTH = BASE_PIPE_WIDTH * scale;
+    PIPE_GAP = BASE_PIPE_GAP * scale;
+    PIPE_SPEED = BASE_PIPE_SPEED * scale;
+    BIRD_X = BASE_BIRD_X * scale;
+
+    if (!isGameStarted || isGameOver) {
+        resetGame();
+    }
+}
+
+
+        // --- Bird Drawing Function ---
+        function drawBird() {
+            // Draw a protective shield circle if active
+            if (isShielded) {
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; // Yellow transparent glow
+                ctx.beginPath();
+                ctx.arc(BIRD_X + BIRD_SIZE / 2, birdY + BIRD_SIZE / 2, BIRD_SIZE * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw the main bird body
+            ctx.fillStyle = isShielded ? 'orange' : 'yellow'; 
+            ctx.fillRect(BIRD_X, birdY, BIRD_SIZE, BIRD_SIZE);
+            
+            // Draw simple eye
+            ctx.fillStyle = 'black';
+            ctx.fillRect(BIRD_X + BIRD_SIZE - 5 * scale, birdY + 5 * scale, 3 * scale, 3 * scale);
+        }
+
+        // --- Power-Up Drawing (Star) ---
+        function drawStar(x, y) {
+            const size = 15 * scale;
+            ctx.fillStyle = 'yellow';
+            ctx.strokeStyle = '#FFD700'; // Gold border
+            ctx.lineWidth = 2 * scale;
+            
+            // Simple 5-pointed star shape approximation
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                const angle = Math.PI / 2 + i * (Math.PI * 2 / 5);
+                const outerX = x + Math.cos(angle) * size;
+                const outerY = y + Math.sin(angle) * size;
+                ctx.lineTo(outerX, outerY);
+                
+                const innerAngle = angle + (Math.PI / 5);
+                const innerX = x + Math.cos(innerAngle) * (size / 2.5);
+                const innerY = y + Math.sin(innerAngle) * (size / 2.5);
+                ctx.lineTo(innerX, innerY);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fill();
+        }
+
+        // --- Pipe Drawing Function ---
+        function drawPipes() {
+            ctx.fillStyle = '#4CAF50';
+            pipes.forEach(pipe => {
+                // Top pipe
+                ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
+                // Bottom pipe
+                ctx.fillRect(pipe.x, pipe.top + PIPE_GAP, PIPE_WIDTH, canvas.height - (pipe.top + PIPE_GAP));
+                
+                // Draw the star if it exists
+                if (pipe.starY) {
+                    drawStar(pipe.x + PIPE_WIDTH / 2, pipe.starY);
+                }
+            });
+        }
+
+        // --- Collision Check ---
+        function checkCollision() {
+            const birdRight = BIRD_X + BIRD_SIZE;
+            const birdBottom = birdY + BIRD_SIZE;
+            
+            // 1. Wall Collision (Top and Bottom) - Always fatal
+            if (birdY < 0 || birdBottom > canvas.height) {
+                return true;
+            }
+
+            // 2. Pipe Collision
+            for (const pipe of pipes) {
+                // Check if bird is horizontally aligned with the pipe
+                if (birdRight > pipe.x && BIRD_X < pipe.x + PIPE_WIDTH) {
+                    // Check for power-up collection
+                    if (pipe.starY) {
+                        const starCenterX = pipe.x + PIPE_WIDTH / 2;
+                        const starCenterY = pipe.starY;
+                        const starRadius = 15 * scale;
+
+                        // Simplified AABB collision check for star
+                        if (birdRight > starCenterX - starRadius && 
+                            BIRD_X < starCenterX + starRadius &&
+                            birdBottom > starCenterY - starRadius && 
+                            birdY < starCenterY + starRadius) 
+                        {
+                            activateShield();
+                            delete pipe.starY; // Remove the star
+                        }
+                    }
+                    
+                    // Check if bird hits the pipe structure
+                    if (birdY < pipe.top || birdBottom > pipe.top + PIPE_GAP) {
+                        // If shielded, ignore pipe collision and continue
+                        if (isShielded) {
+                            return false; 
+                        }
+                        return true; // Game Over
+                    }
+                }
+            }
+            return false;
+        }
+
+        // --- Power-Up System ---
+        function activateShield() {
+            if (shieldTimer) clearTimeout(shieldTimer);
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            isShielded = true;
+            
+            let timeLeft = 5;
+            // Immediately set the initial display text
+            powerDisplay.innerText = `SHIELD: ${timeLeft}s`; 
+
+            // Update display every second
+            countdownInterval = setInterval(() => {
+                timeLeft--;
+                powerDisplay.innerText = `SHIELD: ${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    powerDisplay.innerText = ''; // Clear display when shield ends
+                }
+            }, 1000);
+
+            // Set timer for deactivation
+            shieldTimer = setTimeout(() => {
+                isShielded = false;
+                clearTimeout(shieldTimer);
+            }, SHIELD_DURATION);
+        }
+
+        // --- Game Logic Updates ---
+        function update() {
+            if (isGameOver || !isGameStarted) return;
+
+            // 1. Apply physics
+            velocity += GRAVITY;
+            birdY += velocity;
+
+            // 2. Move and generate pipes
+            if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 150 * scale) {
+                const minHeight = 50 * scale;
+                const maxHeight = canvas.height - PIPE_GAP - minHeight;
+                const randomTop = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+                
+                const newPipe = { x: canvas.width, top: randomTop, scored: false };
+
+                // Randomly add a star in the pipe gap
+                if (Math.random() < STAR_SPAWN_CHANCE) {
+                    newPipe.starY = randomTop + PIPE_GAP / 2; // Center of the gap
+                }
+
+                pipes.push(newPipe);
+            }
+
+            for (let i = 0; i < pipes.length; i++) {
+                let pipe = pipes[i];
+                pipe.x -= PIPE_SPEED;
+
+                // Scoring check
+                if (pipe.x < BIRD_X && !pipe.scored) {
+                    score++;
+                    pipe.scored = true;
+                    scoreDisplay.innerText = `Score: ${score}`;
+                }
+            }
+
+            pipes = pipes.filter(pipe => pipe.x + PIPE_WIDTH > 0);
+
+            // 3. Check for Game Over
+            if (checkCollision()) {
+                isGameOver = true;
+                infoElement.style.display = 'block';
+                infoElement.innerText = `GAME OVER!\nFinal Score: ${score}.\nTap/Space to Restart.`;
+                
+                // Clear any active power-up timers/intervals
+                if (shieldTimer) clearTimeout(shieldTimer);
+                if (countdownInterval) clearInterval(countdownInterval);
+                isShielded = false;
+                powerDisplay.innerText = ''; // Clear power display on Game Over
+
+                return;
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        // --- Main Draw Function ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPipes();
+            drawBird();
+        }
+
+        // --- Flap Control ---
+        function flap() {
+            if (isGameOver) {
+                resetGame();
+                isGameStarted = true;
+                infoElement.style.display = 'none';
+                update(); 
+                return;
+            }
+
+            if (!isGameStarted) {
+                isGameStarted = true;
+                infoElement.style.display = 'none';
+                scoreDisplay.innerText = 'Score: 0';
+                update(); 
+            }
+            velocity = JUMP_VELOCITY;
+        }
+
+        // --- Reset Game State ---
+        function resetGame() {
+            birdY = canvas.height / 2;
+            velocity = 0;
+            pipes = [];
+            score = 0;
+            isGameOver = false;
+            isGameStarted = false;
+            isShielded = false;
+            scoreDisplay.innerText = 'Score: 0';
+            
+            // Reset power-up status and clear display
+            if (shieldTimer) clearTimeout(shieldTimer);
+            if (countdownInterval) clearInterval(countdownInterval);
+            powerDisplay.innerText = ''; 
+            
+            infoElement.style.display = 'block';
+            infoElement.innerText = 'Tap or press Space to start and flap!';
+            draw(); 
+        }
+
+        // --- Event Listeners (PC & Mobile) ---
+        
+        function handleAction(e) {
+            e.preventDefault(); 
+            flap();
+        }
+
+        // PC: Keyboard Spacebar
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.key === ' ') {
+                handleAction(e);
+            }
+        });
+
+        // PC: Mouse Click & Mobile: Touch Tap
+        canvas.addEventListener('click', handleAction);
+        canvas.addEventListener('touchstart', handleAction);
+
+        // --- Initialization ---
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+    </script>
+</body>
+</html>

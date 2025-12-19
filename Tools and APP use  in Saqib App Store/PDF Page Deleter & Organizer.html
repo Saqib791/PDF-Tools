@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Page Deleter & Organizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        .branding {
+            margin-top: 15px;
+            padding: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            text-align: center;
+        }
+        .branding-text {
+            color: white;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin: 0;
+        }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+            margin-top: 20px;
+        }
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        .upload-area.hidden {
+            display: none;
+        }
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        .upload-title {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .upload-text {
+            color: #888;
+        }
+        .file-input {
+            display: none;
+        }
+        .file-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .file-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .file-info {
+            background: #f0f2ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        .file-info.visible {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            width: 100%;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #f0f2ff;
+            color: #667eea;
+            padding: 8px 12px;
+        }
+        .btn-secondary:hover {
+            background: #e0e3ff;
+        }
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            display: none;
+        }
+        .loading.visible {
+            display: block;
+        }
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: white;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        
+        /* New View Controls Styles */
+        .view-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            display: none; /* Hidden by default until file loads */
+        }
+        .view-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .view-btn.active {
+            background: white;
+            color: #667eea;
+        }
+        .view-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .info-banner {
+            background: #e0e7ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .info-banner p {
+            color: #4338ca;
+            font-size: 0.95em;
+            margin: 0;
+        }
+        
+        /* Grid Styles */
+        .pages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .page-item {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            /* FIXED: Removed touch-action: none from here to allow scrolling */
+        }
+        .page-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .page-item.selected {
+            box-shadow: 0 0 0 4px #ef4444;
+        }
+        .page-item.sortable-ghost {
+            opacity: 0.4;
+        }
+        .page-item.sortable-drag {
+            opacity: 0.8;
+            transform: rotate(5deg);
+        }
+        .page-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            pointer-events: none;
+        }
+        .page-number {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.9em;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            pointer-events: none;
+            z-index: 2;
+        }
+        .drag-handle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 1.2em;
+            cursor: move; /* Fallback */
+            cursor: grab;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 2;
+            /* FIXED: touch-action: none added ONLY here for mobile drag */
+            touch-action: none;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        /* New List View Styles */
+        .pages-grid.list-view {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .pages-grid.list-view .page-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            height: 100px; /* Fixed height for list items */
+        }
+        .pages-grid.list-view .page-item:hover {
+            transform: translateX(5px);
+        }
+        .pages-grid.list-view .page-item img {
+            width: auto;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 4px;
+            margin-right: 15px;
+        }
+        .pages-grid.list-view .page-number {
+            position: static;
+            background: #f3f4f6;
+            margin-right: auto; /* Pushes handle to right */
+        }
+        .pages-grid.list-view .drag-handle {
+            position: static;
+            background: #f3f4f6;
+            margin-left: 10px;
+        }
+
+        .delete-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(239, 68, 68, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .page-item.selected .delete-overlay {
+            display: flex;
+        }
+        .delete-icon {
+            background: white;
+            padding: 15px;
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: white;
+        }
+        .footer p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        @media (max-width: 768px) {
+            .pages-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 15px;
+            }
+            h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>PDF Page Deleter & Organizer</h1>
+            <p class="subtitle">Drag to reorder, click to delete, download your modified PDF</p>
+            <div class="branding">
+                <p class="branding-text">✨ Saqib Ka PDF Page Adgester✨</p>
+            </div>
+            
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <h2 class="upload-title">Choose PDF File</h2>
+                <p class="upload-text">Click to browse from your device</p>
+            </div>
+            
+            <input type="file" id="fileInput" class="file-input" accept=".pdf">
+            
+            <div class="file-info" id="fileInfo">
+                <div>
+                    <div id="fileName" class="file-name"></div>
+                    <div id="fileDetails" class="file-details"></div>
+                </div>
+                <button class="btn btn-secondary" id="resetBtn">Close</button>
+            </div>
+            
+            <button class="btn btn-primary" id="downloadBtn" disabled>
+                Download Modified PDF
+            </button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p class="loading-text">Processing PDF...</p>
+        </div>
+        
+        <div class="info-banner" id="infoBanner" style="display: none;">
+            <p>💡 <strong>Drag handles (⋮⋮)</strong> to reorder • <strong>Click pages</strong> to mark for deletion</p>
+        </div>
+
+        <div class="view-controls" id="viewControls">
+            <button class="view-btn active" id="gridBtn">Grid View ▦</button>
+            <button class="view-btn" id="listBtn">List View ☰</button>
+        </div>
+        
+        <div class="pages-grid" id="pagesGrid"></div>
+        
+        <footer class="footer">
+            <p>Made by Saqib</p>
+        </footer>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        let pdfFile = null;
+        let selectedPages = new Set();
+        let totalPages = 0;
+        let pageOrder = [];
+        let sortable = null;
+
+        document.getElementById('uploadArea').addEventListener('click', function() {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                loadPDF(file);
+            } else {
+                alert('Please select a valid PDF file');
+            }
+        });
+
+        // View Toggle Logic
+        const pagesGrid = document.getElementById('pagesGrid');
+        const gridBtn = document.getElementById('gridBtn');
+        const listBtn = document.getElementById('listBtn');
+
+        gridBtn.addEventListener('click', () => {
+            pagesGrid.classList.remove('list-view');
+            gridBtn.classList.add('active');
+            listBtn.classList.remove('active');
+        });
+
+        listBtn.addEventListener('click', () => {
+            pagesGrid.classList.add('list-view');
+            listBtn.classList.add('active');
+            gridBtn.classList.remove('active');
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', reset);
+        document.getElementById('downloadBtn').addEventListener('click', downloadModifiedPDF);
+
+        async function loadPDF(file) {
+            pdfFile = file;
+            selectedPages.clear();
+            pageOrder = [];
+            
+            document.getElementById('uploadArea').classList.add('hidden');
+            document.getElementById('loading').classList.add('visible');
+            document.getElementById('pagesGrid').innerHTML = '';
+            document.getElementById('infoBanner').style.display = 'none';
+            document.getElementById('viewControls').style.display = 'none';
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                totalPages = pdf.numPages;
+                
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('fileDetails').textContent = totalPages + ' pages - 0 selected for deletion';
+                document.getElementById('fileInfo').classList.add('visible');
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    pageOrder.push(i);
+                    await renderPage(pdf, i);
+                }
+                
+                initSortable();
+                document.getElementById('loading').classList.remove('visible');
+                document.getElementById('infoBanner').style.display = 'block';
+                document.getElementById('viewControls').style.display = 'flex'; // Show controls
+            } catch (error) {
+                alert('Error loading PDF: ' + error.message);
+                console.error(error);
+                reset();
+            }
+        }
+
+        async function renderPage(pdf, pageNumber) {
+            const page = await pdf.getPage(pageNumber);
+            // Render smaller thumbnail for better performance
+            const viewport = page.getViewport({ scale: 0.5 }); 
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'page-item';
+            pageDiv.setAttribute('data-page', pageNumber);
+            
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL();
+            
+            const pageNum = document.createElement('div');
+            pageNum.className = 'page-number';
+            pageNum.textContent = pageNumber;
+            
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'drag-handle';
+            dragHandle.innerHTML = '⋮⋮';
+            dragHandle.title = 'Drag to reorder';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'delete-overlay';
+            overlay.innerHTML = '<div class="delete-icon">🗑️</div>';
+            
+            pageDiv.appendChild(img);
+            pageDiv.appendChild(pageNum);
+            pageDiv.appendChild(dragHandle);
+            pageDiv.appendChild(overlay);
+            
+            pageDiv.addEventListener('click', function(e) {
+                if (!e.target.closest('.drag-handle')) {
+                    togglePageSelection(pageNumber, pageDiv);
+                }
+            });
+            
+            document.getElementById('pagesGrid').appendChild(pageDiv);
+        }
+
+        function initSortable() {
+            const grid = document.getElementById('pagesGrid');
+            if (sortable) sortable.destroy();
+            
+            sortable = Sortable.create(grid, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                handle: '.drag-handle', // Important: Drag only via handle
+                touchStartThreshold: 3,
+                onEnd: function(evt) {
+                    updatePageOrder();
+                }
+            });
+        }
+
+        function updatePageOrder() {
+            const grid = document.getElementById('pagesGrid');
+            const pageItems = grid.querySelectorAll('.page-item');
+            pageOrder = [];
+            
+            pageItems.forEach(function(item, index) {
+                const pageNum = parseInt(item.getAttribute('data-page'));
+                pageOrder.push(pageNum);
+                
+                const pageNumElement = item.querySelector('.page-number');
+                // Check if in List view to adjust text if needed, 
+                // but simple number is fine for both
+                pageNumElement.textContent = pageNum + ' → ' + (index + 1);
+            });
+        }
+
+        function togglePageSelection(pageNumber, element) {
+            if (selectedPages.has(pageNumber)) {
+                selectedPages.delete(pageNumber);
+                element.classList.remove('selected');
+            } else {
+                selectedPages.add(pageNumber);
+                element.classList.add('selected');
+            }
+            
+            document.getElementById('fileDetails').textContent = 
+                totalPages + ' pages - ' + selectedPages.size + ' selected for deletion';
+            
+            document.getElementById('downloadBtn').disabled = false;
+        }
+
+        async function downloadModifiedPDF() {
+            if (!pdfFile) {
+                alert('Please select a PDF file');
+                return;
+            }
+
+            document.getElementById('loading').classList.add('visible');
+            document.getElementById('downloadBtn').disabled = true;
+
+            try {
+                const arrayBuffer = await pdfFile.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+                
+                for (let i = 0; i < pageOrder.length; i++) {
+                    const originalPageNum = pageOrder[i];
+                    
+                    if (!selectedPages.has(originalPageNum)) {
+                        const copiedPages = await newPdfDoc.copyPages(pdfDoc, [originalPageNum - 1]);
+                        newPdfDoc.addPage(copiedPages[0]);
+                    }
+                }
+
+                const pdfBytes = await newPdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'modified_' + pdfFile.name;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                alert('PDF downloaded successfully!');
+            } catch (error) {
+                alert('Error creating PDF: ' + error.message);
+                console.error(error);
+            } finally {
+                document.getElementById('loading').classList.remove('visible');
+                document.getElementById('downloadBtn').disabled = false;
+            }
+        }
+
+        function reset() {
+            pdfFile = null;
+            selectedPages.clear();
+            totalPages = 0;
+            pageOrder = [];
+            
+            if (sortable) {
+                sortable.destroy();
+                sortable = null;
+            }
+            
+            document.getElementById('uploadArea').classList.remove('hidden');
+            document.getElementById('fileInfo').classList.remove('visible');
+            document.getElementById('viewControls').style.display = 'none';
+            document.getElementById('pagesGrid').innerHTML = '';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('infoBanner').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
