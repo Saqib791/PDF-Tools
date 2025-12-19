@@ -23,8 +23,6 @@ Here are my previous projects and live links. Check them out and let me know wha
 | Project Name | Description | Live Link |
 | :--- | :--- | :--- |
 | **Speed Runner** | How fast can you go? A high-speed arcade experience. | [Play Now! 🏃‍♂️](https://saqib791.github.io/Saqib-App-Store/speedrunner.html) |
-| **Project Master** | My original app store layout and logic. | [View Project 📂](#) |
-| **Task Buster** | A simple app to keep your daily life organized. | [Open App 📝](#) |
 
 ## 🛠 PDF Magic Tools (Latest Update)
 My latest HTML tools allow you to play with your PDF files directly in the browser. No installation, no fuss!
