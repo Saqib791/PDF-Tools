@@ -35,8 +35,8 @@ html, body {
     transition: filter 0.3s, background 2s ease;
 }
 
-/* BIRD */
-#bird {
+/* runner */
+#runner {
     position: absolute;
     width: 10vw;
     height: 10vw;
@@ -55,7 +55,7 @@ html, body {
 }
 
 /* Shield visual - ENHANCED */
-#bird.shield {
+#runner.shield {
     box-shadow: 0 0 0 6px rgba(0,200,255,0.8),
                 0 0 0 12px rgba(0,200,255,0.4),
                 0 0 20px rgba(0,200,255,0.6),
@@ -280,7 +280,7 @@ button:active {
             <div id="score">Score: 0</div>
             <div id="best-score">Best: 0</div>
         </div>
-        <div id="bird"></div>
+        <div id="runner"></div>
     </div>
 
     <div id="start" class="overlay">
@@ -337,12 +337,12 @@ style="
 <!-- 2️⃣ Firebase init -->
 <script>
 const firebaseConfig = {
-  apiKey: "AIzaSyA4WE8b7S-uqqPZ2xQznZS4FDoYgkvcKrA",
-  authDomain: "speed-runner-56175.firebaseapp.com",
-  projectId: "speed-runner-56175",
-  storageBucket: "speed-runner-56175.firebasestorage.app",
-  messagingSenderId: "81044322138",
-  appId: "1:81044322138:web:c9cf29677c92d40546e563"
+  apiKey: "xxxxx",
+  authDomain: "xxxxx",
+  projectId: "xxxxxx",
+  storageBucket: "xxxxxxx",
+  messagingSenderId: "xxxxxxx",
+  appId: "xxxxxxxxxxxxx"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -360,7 +360,7 @@ fixVH(); window.addEventListener('resize', fixVH);
 
 /* ===== ELEMENTS ===== */
 const screen = document.getElementById('game-screen');
-const bird = document.getElementById('bird');
+const runner = document.getElementById('runner');
 const scoreEl = document.getElementById('score');
 const bestScoreEl = document.getElementById('best-score');
 const shieldIndicator = document.getElementById('shield-indicator');
@@ -432,10 +432,10 @@ let shieldStartTime = 0;
 function resize(){
     w = screen.clientWidth;
     h = screen.clientHeight;
-    bw = bird.offsetWidth;
-    bh = bird.offsetHeight;
+    bw = runner.offsetWidth;
+    bh = runner.offsetHeight;
     bx = w/2 - bw/2;
-    bird.style.left = bx+'px';
+    runner.style.left = bx+'px';
 }
 resize(); window.addEventListener('resize', resize);
 
@@ -448,7 +448,7 @@ function move(e){
     const rect = screen.getBoundingClientRect();
     const x = (e.touches?e.touches[0].clientX:e.clientX) - rect.left;
     bx = Math.max(0, Math.min(w-bw, x-bw/2));
-    bird.style.left = bx+'px';
+    runner.style.left = bx+'px';
     e.preventDefault();
 }
 
@@ -624,13 +624,13 @@ function spawnShield(pillar){
 function activateShield(){
     shield = true;
     shieldStartTime = Date.now();
-    bird.classList.add('shield');
+    runner.classList.add('shield');
     shieldIndicator.classList.add('active');
 }
 
 function deactivateShield(){
     shield = false;
-    bird.classList.remove('shield');
+    runner.classList.remove('shield');
     shieldIndicator.classList.remove('active');
 }
 
@@ -663,7 +663,7 @@ function updateEffects(){
     const intensity = Math.min(1,(speed-HIGH_SPEED_WARNING)/3);
 
     if(!shield && intensity > 0){
-        bird.style.boxShadow = `0 0 ${20+30*intensity}px rgba(255,80,80,${intensity}), 0 4px 8px rgba(0,0,0,0.3)`;
+        runner.style.boxShadow = `0 0 ${20+30*intensity}px rgba(255,80,80,${intensity}), 0 4px 8px rgba(0,0,0,0.3)`;
     }
 
     if(speed > HIGH_SPEED_WARNING){
@@ -802,7 +802,7 @@ score = profile.score || 0;
     deactivateShield();
 
     scoreEl.textContent = 'Score: ' + score;
-    bird.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';
+    runner.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';
     
     // Reset to default light background
     screen.style.background = 'linear-gradient(180deg, #B3E5FC 0%, #81D4FA 100%)';
