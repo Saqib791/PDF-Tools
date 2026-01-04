@@ -9,10 +9,7 @@
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI}
-body{
-    background:linear-gradient(135deg,#f5f7fa,#c3cfe2);
-    padding:20px;
-}
+body{background:linear-gradient(135deg,#f5f7fa,#c3cfe2);padding:20px}
 .container{max-width:900px;margin:auto}
 
 header{
@@ -24,11 +21,7 @@ header{
     justify-content:space-between;
     align-items:center;
 }
-header h1{font-size:1.8rem}
-.add-btn{
-    font-size:1.4rem;
-    cursor:pointer;
-}
+.add-btn{font-size:1.4rem;cursor:pointer}
 
 .list-box{
     background:#fff;
@@ -39,9 +32,17 @@ header h1{font-size:1.8rem}
 .list-header{
     display:flex;
     justify-content:space-between;
+    align-items:center;
     border-bottom:2px solid #eee;
     padding-bottom:8px;
 }
+.actions i{
+    margin-left:10px;
+    cursor:pointer;
+    color:#888;
+}
+.actions i:hover{color:#000}
+
 .progress{
     height:16px;
     background:#e0e0e0;
@@ -51,9 +52,9 @@ header h1{font-size:1.8rem}
 }
 .progress-bar{
     height:100%;
-    width:0%;
     background:linear-gradient(to right,#4facfe,#00f2fe);
 }
+
 .item{
     display:flex;
     align-items:center;
@@ -62,37 +63,27 @@ header h1{font-size:1.8rem}
 }
 .item:last-child{border:none}
 .tick{
-    width:22px;
-    height:22px;
-    border-radius:50%;
-    border:2px solid #999;
-    margin-right:12px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    width:22px;height:22px;border-radius:50%;
+    border:2px solid #999;margin-right:12px;
+    display:flex;align-items:center;justify-content:center;
     cursor:pointer;
 }
 .tick.done{
-    background:#4facfe;
-    color:#fff;
-    border-color:#4facfe;
+    background:#4facfe;color:#fff;border-color:#4facfe;
     cursor:not-allowed;
 }
 .name{flex:1}
 .time{
-    font-size:.8rem;
-    background:#f2f2f2;
-    padding:3px 8px;
-    border-radius:12px;
+    font-size:.8rem;background:#f2f2f2;
+    padding:3px 8px;border-radius:12px;
 }
 
+/* modal */
 .modal{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.4);
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.45);
     display:none;
-    align-items:center;
-    justify-content:center;
+    align-items:center;justify-content:center;
 }
 .modal-box{
     background:#fff;
@@ -102,18 +93,21 @@ header h1{font-size:1.8rem}
     border-radius:12px;
 }
 .modal-box input,textarea{
-    width:100%;
-    margin-top:10px;
-    padding:10px;
+    width:100%;padding:10px;margin-top:10px;
 }
 .modal-box button{
-    margin-top:12px;
-    width:100%;
-    padding:10px;
-    border:none;
-    background:#4facfe;
-    color:#fff;
+    width:100%;margin-top:12px;
+    padding:10px;border:none;
+    background:#4facfe;color:#fff;
     border-radius:8px;
+}
+.modal-box .danger{
+    background:#ff4d4d;
+}
+.note{
+    font-size:.85rem;
+    color:#c00;
+    margin-top:6px;
 }
 </style>
 </head>
@@ -123,15 +117,14 @@ header h1{font-size:1.8rem}
 
 <header>
     <h1>🧼 Bartan Duty Lists</h1>
-    <i class="fas fa-pencil-alt add-btn" onclick="openModal()"></i>
+    <i class="fas fa-pencil-alt add-btn" onclick="openCreate()"></i>
 </header>
 
 <div id="lists"></div>
-
 </div>
 
-<!-- Modal -->
-<div class="modal" id="modal">
+<!-- Create List Modal -->
+<div class="modal" id="createModal">
     <div class="modal-box">
         <h3>Create New List</h3>
         <input id="listTitle" placeholder="List Heading">
@@ -140,89 +133,105 @@ header h1{font-size:1.8rem}
     </div>
 </div>
 
+<!-- Delete Modal -->
+<div class="modal" id="deleteModal">
+    <div class="modal-box">
+        <h3>Delete List</h3>
+        <p class="note">
+            Type exactly:<br>
+            <b>sab ki sahmati se delete hui hay</b>
+        </p>
+        <input id="confirmText" placeholder="Type confirmation text">
+        <button class="danger" onclick="confirmDelete()">Delete List</button>
+    </div>
+</div>
+
 <script>
 let lists = JSON.parse(localStorage.getItem("multiDuty")) || [];
+let deleteIndex = null;
 
-const listWrap = document.getElementById("lists");
+const wrap = document.getElementById("lists");
 
 function render(){
-    listWrap.innerHTML="";
+    wrap.innerHTML="";
     lists.forEach((l,li)=>{
         let done = l.items.filter(i=>i.done).length;
         let percent = (done/l.items.length)*100;
 
-        listWrap.innerHTML += `
+        wrap.innerHTML+=`
         <div class="list-box">
             <div class="list-header">
                 <h3>${l.title}</h3>
-                <b>${done}/${l.items.length}</b>
+                <div class="actions">
+                    <b>${done}/${l.items.length}</b>
+                    <i class="fas fa-trash" onclick="openDelete(${li})"></i>
+                </div>
             </div>
             <div class="progress">
                 <div class="progress-bar" style="width:${percent}%"></div>
             </div>
             ${l.items.map((i,ii)=>`
-                <div class="item">
-                    <div class="tick ${i.done?"done":""}"
-                        onclick="tick(${li},${ii})">
-                        ${i.done?"✔":""}
-                    </div>
-                    <div class="name">${i.name}</div>
-                    <div class="time">${i.time||"Pending"}</div>
+            <div class="item">
+                <div class="tick ${i.done?"done":""}" onclick="tick(${li},${ii})">
+                    ${i.done?"✔":""}
                 </div>
-            `).join("")}
+                <div class="name">${i.name}</div>
+                <div class="time">${i.time||"Pending"}</div>
+            </div>`).join("")}
         </div>
         `;
 
-        // auto reset list
         if(done === l.items.length){
             setTimeout(()=>{
-                l.items.forEach(it=>{
-                    it.done=false;
-                    it.time=null;
-                });
-                save();
-                render();
+                l.items.forEach(it=>{it.done=false;it.time=null});
+                save();render();
             },1000);
         }
     });
 }
 
 function tick(li,ii){
-    let item = lists[li].items[ii];
-    if(item.done) return;
-    item.done=true;
-    item.time=new Date().toLocaleString("en-IN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"});
-    save();
-    render();
+    let it = lists[li].items[ii];
+    if(it.done) return;
+    it.done=true;
+    it.time=new Date().toLocaleString("en-IN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"});
+    save();render();
 }
 
 function save(){
     localStorage.setItem("multiDuty",JSON.stringify(lists));
 }
 
-function openModal(){
-    document.getElementById("modal").style.display="flex";
+function openCreate(){
+    createModal.style.display="flex";
 }
-
 function createList(){
-    let title = listTitle.value.trim();
-    let names = listNames.value.split(",").map(n=>n.trim()).filter(Boolean);
-    if(!title || !names.length) return alert("Fill all fields");
-
-    lists.push({
-        title,
-        items:names.map(n=>({name:n,done:false,time:null}))
-    });
-
-    save();
-    render();
-    modal.style.display="none";
-    listTitle.value="";
-    listNames.value="";
+    let t=listTitle.value.trim();
+    let n=listNames.value.split(",").map(x=>x.trim()).filter(Boolean);
+    if(!t||!n.length) return alert("Fill all fields");
+    lists.push({title:t,items:n.map(x=>({name:x,done:false,time:null}))});
+    save();render();
+    createModal.style.display="none";
+    listTitle.value="";listNames.value="";
 }
 
+function openDelete(i){
+    deleteIndex=i;
+    confirmText.value="";
+    deleteModal.style.display="flex";
+}
+
+function confirmDelete(){
+    if(confirmText.value !== "sab ki sahmati se delete hui hay"){
+        alert("Confirmation text galat hai ❌");
+        return;
+    }
+    lists.splice(deleteIndex,1);
+    save();render();
+    deleteModal.style.display="none";
+}
 render();
 </script>
 
-</body> 
+</body>
 </html>
