@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bartan Duty – Multi List</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI}
+body{
+    background:linear-gradient(135deg,#f5f7fa,#c3cfe2);
+    padding:20px;
+}
+.container{max-width:900px;margin:auto}
+
+header{
+    background:linear-gradient(to right,#4facfe,#00f2fe);
+    color:#fff;
+    padding:20px;
+    border-radius:12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+header h1{font-size:1.8rem}
+.add-btn{
+    font-size:1.4rem;
+    cursor:pointer;
+}
+
+.list-box{
+    background:#fff;
+    margin-top:20px;
+    padding:20px;
+    border-radius:12px;
+}
+.list-header{
+    display:flex;
+    justify-content:space-between;
+    border-bottom:2px solid #eee;
+    padding-bottom:8px;
+}
+.progress{
+    height:16px;
+    background:#e0e0e0;
+    border-radius:10px;
+    overflow:hidden;
+    margin:12px 0;
+}
+.progress-bar{
+    height:100%;
+    width:0%;
+    background:linear-gradient(to right,#4facfe,#00f2fe);
+}
+.item{
+    display:flex;
+    align-items:center;
+    padding:10px 0;
+    border-bottom:1px solid #eee;
+}
+.item:last-child{border:none}
+.tick{
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    border:2px solid #999;
+    margin-right:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+}
+.tick.done{
+    background:#4facfe;
+    color:#fff;
+    border-color:#4facfe;
+    cursor:not-allowed;
+}
+.name{flex:1}
+.time{
+    font-size:.8rem;
+    background:#f2f2f2;
+    padding:3px 8px;
+    border-radius:12px;
+}
+
+.modal{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.4);
+    display:none;
+    align-items:center;
+    justify-content:center;
+}
+.modal-box{
+    background:#fff;
+    padding:20px;
+    width:90%;
+    max-width:400px;
+    border-radius:12px;
+}
+.modal-box input,textarea{
+    width:100%;
+    margin-top:10px;
+    padding:10px;
+}
+.modal-box button{
+    margin-top:12px;
+    width:100%;
+    padding:10px;
+    border:none;
+    background:#4facfe;
+    color:#fff;
+    border-radius:8px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+    <h1>🧼 Bartan Duty Lists</h1>
+    <i class="fas fa-pencil-alt add-btn" onclick="openModal()"></i>
+</header>
+
+<div id="lists"></div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal" id="modal">
+    <div class="modal-box">
+        <h3>Create New List</h3>
+        <input id="listTitle" placeholder="List Heading">
+        <textarea id="listNames" placeholder="Names (comma separated)"></textarea>
+        <button onclick="createList()">Create</button>
+    </div>
+</div>
+
+<script>
+let lists = JSON.parse(localStorage.getItem("multiDuty")) || [];
+
+const listWrap = document.getElementById("lists");
+
+function render(){
+    listWrap.innerHTML="";
+    lists.forEach((l,li)=>{
+        let done = l.items.filter(i=>i.done).length;
+        let percent = (done/l.items.length)*100;
+
+        listWrap.innerHTML += `
+        <div class="list-box">
+            <div class="list-header">
+                <h3>${l.title}</h3>
+                <b>${done}/${l.items.length}</b>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" style="width:${percent}%"></div>
+            </div>
+            ${l.items.map((i,ii)=>`
+                <div class="item">
+                    <div class="tick ${i.done?"done":""}"
+                        onclick="tick(${li},${ii})">
+                        ${i.done?"✔":""}
+                    </div>
+                    <div class="name">${i.name}</div>
+                    <div class="time">${i.time||"Pending"}</div>
+                </div>
+            `).join("")}
+        </div>
+        `;
+
+        // auto reset list
+        if(done === l.items.length){
+            setTimeout(()=>{
+                l.items.forEach(it=>{
+                    it.done=false;
+                    it.time=null;
+                });
+                save();
+                render();
+            },1000);
+        }
+    });
+}
+
+function tick(li,ii){
+    let item = lists[li].items[ii];
+    if(item.done) return;
+    item.done=true;
+    item.time=new Date().toLocaleString("en-IN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"});
+    save();
+    render();
+}
+
+function save(){
+    localStorage.setItem("multiDuty",JSON.stringify(lists));
+}
+
+function openModal(){
+    document.getElementById("modal").style.display="flex";
+}
+
+function createList(){
+    let title = listTitle.value.trim();
+    let names = listNames.value.split(",").map(n=>n.trim()).filter(Boolean);
+    if(!title || !names.length) return alert("Fill all fields");
+
+    lists.push({
+        title,
+        items:names.map(n=>({name:n,done:false,time:null}))
+    });
+
+    save();
+    render();
+    modal.style.display="none";
+    listTitle.value="";
+    listNames.value="";
+}
+
+render();
+</script>
+
+</body>
+</html>
